@@ -41,8 +41,13 @@ export default function InspectorPanel() {
   // Calculate Pit Depth (elevation difference from mined blocks)
   let pitDepthStr = '-';
   if (minedBlocks.length > 0) {
-    const zs = minedBlocks.map((b) => b.Z);
-    const depth = Math.max(...zs) - Math.min(...zs) + (minedBlocks[0]?.DZ || 10);
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < minedBlocks.length; i++) {
+      const z = minedBlocks[i].Z;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    const depth = (maxZ - minZ) + (minedBlocks[0]?.DZ || 10);
     pitDepthStr = `${fmtId(depth, 1)} m`;
   }
 

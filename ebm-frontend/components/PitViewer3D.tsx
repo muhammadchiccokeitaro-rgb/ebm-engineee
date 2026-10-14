@@ -374,9 +374,13 @@ function TopographyRender({ topoMesh, scale, midX, midY, midZ }: { topoMesh: Top
   useEffect(() => {
     if (!geometryRef.current || !topoMesh) return;
     
-    const zs = topoMesh.vertices.map(v => v[2]);
-    const minZ = Math.min(...zs);
-    const maxZ = Math.max(...zs);
+    let minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < topoMesh.vertices.length; i++) {
+      const z = topoMesh.vertices[i][2];
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    if (minZ === Infinity) { minZ = 0; maxZ = 1; }
     const rangeZ = Math.max(maxZ - minZ, 0.1);
 
     const flatVertices = new Float32Array(topoMesh.vertices.length * 3);
@@ -532,14 +536,16 @@ function PitShellRender({ blocks, scale }: { blocks: BlockData[]; scale: number 
   const shellGeometry = useMemo(() => {
     if (minedNorm.length === 0) return null;
 
+    let minY = Infinity;
     const colMap = new Map<string, number>();
-    for (const b of minedNorm) {
+    for (let i = 0; i < minedNorm.length; i++) {
+      const b = minedNorm[i];
+      if (b.ny < minY) minY = b.ny;
       const key = `${b.nx.toFixed(2)},${b.nz.toFixed(2)}`;
       const cur = colMap.get(key);
       if (cur === undefined || b.ny > cur) colMap.set(key, b.ny);
     }
-
-    const minY = Math.min(...minedNorm.map(b => b.ny));
+    if (minY === Infinity) minY = 0;
 
     const positions: number[] = [];
     const indices: number[] = [];
@@ -702,8 +708,16 @@ export default function PitViewer3D() {
 
   if (!showCanvas) return <div className="flex-1 bg-black"></div>;
 
-  const oreGrades = pitBlocks.filter(b => b.Destination === 'Ore' || b.Model_Type === 'Ore').map(b => b.Grade);
-  const maxGrade = oreGrades.length > 0 ? Math.max(...oreGrades, 0.01) : 1;
+  const maxGrade = useMemo(() => {
+    let max = 0.01;
+    for (let i = 0; i < pitBlocks.length; i++) {
+      const b = pitBlocks[i];
+      if ((b.Destination === 'Ore' || b.Model_Type === 'Ore') && b.Grade > max) {
+        max = b.Grade;
+      }
+    }
+    return max;
+  }, [pitBlocks]);
 
   return (
     <div className={`flex-1 relative overflow-hidden select-none transition-colors duration-300 ${isDark ? 'bg-[#080b11]' : 'bg-[#F8FAFC]'}`}>
