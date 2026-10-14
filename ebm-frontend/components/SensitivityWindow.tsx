@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useEBMStore } from '../store/ebmStore';
+import { useEBMStore, API_BASE, API_HEADERS } from '../store/ebmStore';
 import { X, Minus, RefreshCw, TrendingUp } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -56,8 +56,7 @@ export default function SensitivityWindow({ onClose, onMinimize, chartRef }: Sen
     try {
       const formData = new FormData();
       formData.append('financial_params', JSON.stringify(financialParams));
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
-      const res = await fetch(`${apiBase}/api/sensitivity`, { method: 'POST', body: formData });
+      const res = await fetch(`${API_BASE}/api/sensitivity`, { method: 'POST', headers: API_HEADERS, body: formData });
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'API Error'); }
       const data = await res.json();
       setResults(data.scenarios || []);
