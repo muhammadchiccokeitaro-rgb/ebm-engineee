@@ -177,7 +177,9 @@ interface EBMStore {
   processTopographyFile: (file: File) => Promise<void>;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+// Melewati halaman pengingat localtunnel (loca.lt) yang membalas status 511 tanpa header ini
+export const API_HEADERS: Record<string, string> = { 'bypass-tunnel-reminder': 'true' };
 
 const useEBMStore = create<EBMStore>((set, get) => ({
   // Initial state from InspectorPanel
@@ -293,6 +295,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
 
       const res = await fetch(`${API_BASE}/api/v1/process-pit-boundary-kmz`, {
         method: 'POST',
+        headers: API_HEADERS,
         body: formData,
       });
 
@@ -458,6 +461,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
 
       const res = await fetch(endpoint, {
         method: 'POST',
+        headers: API_HEADERS,
         body: formData,
       });
 
@@ -533,6 +537,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
 
       const res = await fetch(`${API_BASE}/api/v1/optimize-pit`, {
         method: 'POST',
+        headers: API_HEADERS,
         body: formData,
       });
 
