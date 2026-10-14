@@ -177,7 +177,7 @@ interface EBMStore {
   processTopographyFile: (file: File) => Promise<void>;
 }
 
-const API_BASE = 'http://127.0.0.1:8001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
 
 const useEBMStore = create<EBMStore>((set, get) => ({
   // Initial state from InspectorPanel

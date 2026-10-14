@@ -56,8 +56,8 @@ export default function SensitivityWindow({ onClose, onMinimize, chartRef }: Sen
     try {
       const formData = new FormData();
       formData.append('financial_params', JSON.stringify(financialParams));
-      formData.append('file', csvFile);
-      const res = await fetch('http://127.0.0.1:8001/api/sensitivity', { method: 'POST', body: formData });
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+      const res = await fetch(`${apiBase}/api/sensitivity`, { method: 'POST', body: formData });
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'API Error'); }
       const data = await res.json();
       setResults(data.scenarios || []);
