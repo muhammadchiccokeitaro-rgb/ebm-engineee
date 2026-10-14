@@ -1,0 +1,111 @@
+﻿import time
+
+# Parse financial parameters
+try:
+    params_dict = json.loads(financial_params)
+    params = FinancialParameters(**params_dict)
+except Exception as e:
+    raise HTTPException(status_code=400, detail=f"Invalid financial_params JSON: {str(e)}")
+
+# Read file
+try:
+    content = await file.read()
+    df = read_csv_robust(content)
+except Exception as e:
+    raise HTTPException(status_code=400, detail=f"Gagal membaca file CSV: {str(e)}")
+
+# Normalkan nama kolom (alias mapping dari berbagai software geologi)
+try:
+    df = apply_column_aliases(df)
+except ValueError as e:
+    raise HTTPException(status_code=400, detail=str(e))
+
+# Validasi kolom wajib (setelah alias mapping, semua harus sudah standar)
+required_cols = ['X', 'Y', 'Z', 'DX', 'DY', 'DZ', 'Grade', 'Density', 'RockType']
+missing_cols = [c for c in required_cols if c not in df.columns]
+if missing_cols:
+    raise HTTPException(
+        status_code=400,
+        detail=f"Kolom internal tidak ditemukan setelah alias mapping: {missing_cols}. "
+               f"Ini seharusnya tidak terjadi â€” laporkan ke developer."
+    )
+
+# Sparse Grid Protection
+try:
+    dx = df['DX'].median()
+    dy = df['DY'].median()
+    dz = df['DZ'].median()
+    range_x = df['X'].max() - df['X'].min()
+    range_y = df['Y'].max() - df['Y'].min()
+    range_z = df['Z'].max() - df['Z'].min()
+    
+    if dx > 0 and dy > 0 and dz > 0:
+        estimated_blocks = (range_x / dx) * (range_y / dy) * (range_z / dz)
+        if estimated_blocks > 1000000:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Resolusi grid terlalu besar/jarang (estimasi > {int(estimated_blocks):,} blok). Silakan upload model blok yang lebih padat atau perkecil area (bounding box)."
+            )
+except Exception as e:
+    if isinstance(e, HTTPException): raise e
+    pass
+
+timings = {}
+
+# Fase 1: Kalkulasi BEV
+t0 = time.perf_counter()
+df_bev = calculate_bev(df, params)
+timings['bev_calculation'] = time.perf_counter() - t0
+
+# Fase 2: Pembentukan Graf Ketergantungan
+t0 = time.perf_counter()
+graph = build_precedence_graph(df_bev, params.osa)
+timings['graph_building'] = time.perf_counter() - t0
+
+# Fase 3: Pencarian UPL (Maximum Weight Closure)
+t0 = time.perf_counter()
+df_optimized = optimize_pit(df_bev, graph)
+timings['optimization'] = time.perf_counter() - t0
+
+timings['total'] = sum(timings.values())
+
+# Fase 4: Ekstrak Summary
+df_mined = df_optimized[df_optimized['MINED_STATUS'] == 1]
+
+df_ore = df_mined[df_mined['Destination'] == 'Ore']
+df_waste = df_mined[df_mined['Destination'] == 'Waste']
+
+total_ore_tonnage = df_ore['Tonase'].sum()
+total_waste_tonnage = df_waste['Tonase'].sum()
+stripping_ratio = total_waste_tonnage / total_ore_tonnage if total_ore_tonnage > 0 else 0.0
+total_npv = df_mined['BEV'].sum()
+
+summary = OptimizationSummary(
+    total_ore_tonnage=float(total_ore_tonnage),
+    total_waste_tonnage=float(total_waste_tonnage),
+    stripping_ratio=float(stripping_ratio),
+    total_npv=float(total_npv)
+)
+
+# Auto-Origin Normalization
+min_x = float(df_optimized['X'].min())
+min_y = float(df_optimized['Y'].min())
+df_optimized['Local_X'] = df_optimized['X'] - min_x
+df_optimized['Local_Y'] = df_optimized['Y'] - min_y
+
+out_cols = ['X', 'Y', 'Z', 'Local_X', 'Local_Y', 'DX', 'DY', 'DZ', 'Grade', 'Density', 'RockType', 'Model_Type', 'BEV', 'Destination', 'MINED_STATUS']
+pit_shell_matrix = df_optimized[out_cols].to_dict(orient='records')
+
+# Ekstrak unique lithology (RockType)
+unique_lithologies = []
+if 'RockType' in df_optimized.columns:
+    unique_lithologies = df_optimized['RockType'].dropna().unique().tolist()
+
+return {
+    "summary": summary.dict(),
+    "pit_shell_matrix": pit_shell_matrix,
+    "min_x": min_x,
+    "min_y": min_y,
+    "lithologies": unique_lithologies,
+    "timings": timings
+}

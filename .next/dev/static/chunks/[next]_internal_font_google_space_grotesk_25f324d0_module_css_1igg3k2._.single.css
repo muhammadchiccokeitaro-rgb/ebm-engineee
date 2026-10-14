@@ -1,0 +1,20 @@
+/* [next]/internal/font/google/space_grotesk_25f324d0.module.css [app-client] (css) */
+@font-face {
+  font-family: Space Grotesk Fallback;
+  src: local(Arial);
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0.0%;
+  size-adjust: 109.69%;
+}
+
+.space_grotesk_25f324d0-module___WK4EG__className {
+  font-family: Space Grotesk, Space Grotesk Fallback;
+  font-style: normal;
+}
+
+.space_grotesk_25f324d0-module___WK4EG__variable {
+  --font-space-grotesk: "Space Grotesk", "Space Grotesk Fallback";
+}
+
+/*# sourceMappingURL=%5Bnext%5D_internal_font_google_space_grotesk_25f324d0_module_css_1igg3k2._.single.css.map*/

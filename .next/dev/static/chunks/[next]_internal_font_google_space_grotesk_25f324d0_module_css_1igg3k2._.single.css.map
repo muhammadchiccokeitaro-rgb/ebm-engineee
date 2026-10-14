@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[next]/internal/font/google/space_grotesk_25f324d0.module.css"],"sourcesContent":["@font-face {\n    font-family: 'Space Grotesk Fallback';\n    src: local(\"Arial\");\n    ascent-override: 89.71%;\ndescent-override: 26.62%;\nline-gap-override: 0.00%;\nsize-adjust: 109.69%;\n\n}\n.className {\n    font-family: 'Space Grotesk', 'Space Grotesk Fallback';\n    font-style: normal;\n\n}\n.variable {\n    --font-space-grotesk: 'Space Grotesk', 'Space Grotesk Fallback';\n}\n"],"names":[],"mappings":"AAAA;;;;;;;;;AASA;;;;;AAKA","ignoreList":[0]}}]
+}
