@@ -44,7 +44,7 @@ const LOADING_TEXTS = [
 ];
 
 export default function SensitivityWindow({ onClose, onMinimize, chartRef }: SensitivityWindowProps) {
-  const { financialParams, csvFile } = useEBMStore();
+  const { financialParams, csvFile, apiUrl } = useEBMStore();
   const [results, setResults] = useState<SensitivityResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export default function SensitivityWindow({ onClose, onMinimize, chartRef }: Sen
     try {
       const formData = new FormData();
       formData.append('financial_params', JSON.stringify(financialParams));
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+      const apiBase = apiUrl || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
       const res = await fetch(`${apiBase}/api/sensitivity`, { method: 'POST', body: formData });
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'API Error'); }
       const data = await res.json();

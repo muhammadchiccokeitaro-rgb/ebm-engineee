@@ -172,14 +172,32 @@ interface EBMStore {
   setSelectedBlock: (block: any | null) => void;
   setViewMode: (mode: string) => void;
   setR3fContext: (context: any) => void;
+  apiUrl: string;
+  setApiUrl: (url: string) => void;
   setShowInspector: (show: boolean) => void;
   runOptimization: () => Promise<void>;
   processTopographyFile: (file: File) => Promise<void>;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+export const getInitialApiUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('EBM_API_URL');
+    if (saved && saved.trim()) return saved.trim().replace(/\/+$/, '');
+  }
+  return (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001').replace(/\/+$/, '');
+};
+
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
 
 const useEBMStore = create<EBMStore>((set, get) => ({
+  apiUrl: getInitialApiUrl(),
+  setApiUrl: (url: string) => {
+    const clean = url.trim().replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('EBM_API_URL', clean);
+    }
+    set({ apiUrl: clean });
+  },
   // Initial state from InspectorPanel
   summary: null,
   selectedBlock: null,
@@ -291,7 +309,8 @@ const useEBMStore = create<EBMStore>((set, get) => ({
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(`${API_BASE}/api/v1/process-pit-boundary-kmz`, {
+      const apiBase = get().apiUrl || getInitialApiUrl();
+      const res = await fetch(`${apiBase}/api/v1/process-pit-boundary-kmz`, {
         method: 'POST',
         body: formData,
       });
@@ -451,9 +470,10 @@ const useEBMStore = create<EBMStore>((set, get) => ({
       formData.append('file', file);
 
       const ext = file.name.split('.').pop()?.toLowerCase();
-      let endpoint = `${API_BASE}/api/v1/process-topography`;
+      const apiBase = get().apiUrl || getInitialApiUrl();
+      let endpoint = `${apiBase}/api/v1/process-topography`;
       if (ext === 'kmz' || ext === 'kml') {
-        endpoint = `${API_BASE}/api/v1/process-topography-kmz`;
+        endpoint = `${apiBase}/api/v1/process-topography-kmz`;
       }
 
       const res = await fetch(endpoint, {
@@ -531,7 +551,8 @@ const useEBMStore = create<EBMStore>((set, get) => ({
       formData.append('file', csvFile);
       formData.append('financial_params', JSON.stringify(payload));
 
-      const res = await fetch(`${API_BASE}/api/v1/optimize-pit`, {
+      const apiBase = get().apiUrl || getInitialApiUrl();
+      const res = await fetch(`${apiBase}/api/v1/optimize-pit`, {
         method: 'POST',
         body: formData,
       });
