@@ -329,10 +329,23 @@ export default function TopToolbar() {
                     }}
                     className="flex items-center justify-between text-left px-3 py-2 rounded-lg bg-[#1a1a2c] hover:bg-[#22223a] border border-[#2c2c42] text-gray-300 transition-colors"
                   >
-                    <span className="font-mono text-amber-300 truncate max-w-[260px]">
+                    <span className="font-mono text-amber-300 truncate max-w-[240px]">
                       promising-cards...trycloudflare.com
                     </span>
-                    <span className="text-[10px] text-gray-500">Cloudflare Tunnel</span>
+                    <span className="text-[10px] text-amber-400 font-semibold">Lokal via Web (Cepat & Kuat)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const railway = 'https://believable-wonder-production-eb97.up.railway.app';
+                      setTempUrl(railway);
+                      handleTestConnection(railway);
+                    }}
+                    className="flex items-center justify-between text-left px-3 py-2 rounded-lg bg-[#1a1a2c] hover:bg-[#22223a] border border-[#2c2c42] text-gray-300 transition-colors"
+                  >
+                    <span className="font-mono text-purple-300 truncate max-w-[240px]">
+                      believable-wonder...railway.app
+                    </span>
+                    <span className="text-[10px] text-gray-500">Railway Cloud (Model Kecil)</span>
                   </button>
                 </div>
               </div>

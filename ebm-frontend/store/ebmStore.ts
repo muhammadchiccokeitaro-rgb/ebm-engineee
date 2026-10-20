@@ -563,7 +563,8 @@ const useEBMStore = create<EBMStore>((set, get) => ({
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server error (Status ${res.status})`);
+        const detailMsg = errorData.detail || errorData.message || (res.status === 502 ? 'Server cloud kehabisan memori RAM / batas waktu terlampaui (Error 502). Gunakan koneksi Cloudflare Tunnel (server lokal).' : `Server error (Status ${res.status})`);
+        throw new Error(detailMsg);
       }
 
       // Use text()+JSON.parse instead of res.json() to avoid recursive JSON parsing
@@ -642,7 +643,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
       const isFetchError = error?.name === 'TypeError' || String(error?.message || '').toLowerCase().includes('fetch');
       const apiBase = get().apiUrl || getInitialApiUrl();
       const message = isFetchError
-        ? `Gagal terhubung ke backend API di "${apiBase}". Pastikan backend FastAPI aktif atau periksa pengaturan API Server di menu toolbar.`
+        ? `Gagal terhubung ke backend API di "${apiBase}". Untuk model blok besar (>100k blok), server Railway mungkin kehabisan memori atau timeout. Disarankan beralih ke Cloudflare Tunnel (server lokal) via tombol API di toolbar.`
         : (error.message || 'Gagal menjalankan optimasi');
       set({ error: message, isLoading: false });
     }
