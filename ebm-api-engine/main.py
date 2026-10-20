@@ -243,7 +243,9 @@ async def optimize_pit_endpoint(
         if "Jumlah edge melebihi batas" in str(e):
             raise HTTPException(
                 status_code=400,
-                detail="Domain geoteknik terlalu kompleks/bercampur dan melebihi batas memori komputasi (>50 juta edge). Silakan sederhanakan GEON mapping Anda atau kurangi jumlah blok."
+                detail="Domain geoteknik terlalu kompleks/bercampur dan melebihi batas memori komputasi (>300 juta edge). Silakan sederhanakan GEON mapping Anda atau kurangi jumlah blok."
+
+
             )
         raise HTTPException(status_code=400, detail=str(e)) from e
     

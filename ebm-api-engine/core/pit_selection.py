@@ -60,10 +60,17 @@ def _schedule_order(
         cash_flow_by_year[year] = cash_flow_by_year.get(year, 0.0) + bev[position]
 
     mine_life_years = max(cash_flow_by_year, default=0)
-    npv = math.fsum(
-        cash_flow / ((1.0 + discount_rate) ** year)
-        for year, cash_flow in cash_flow_by_year.items()
-    )
+    if discount_rate and discount_rate > 0:
+        # Untuk tahun yang sangat jauh, (1+r)^year meledak → kontribusi NPV ≈ 0, aman di-skip
+        _MAX_YEAR = int(math.log(1e300) / math.log(1.0 + discount_rate))
+        npv = math.fsum(
+            cash_flow / ((1.0 + discount_rate) ** year)
+            for year, cash_flow in cash_flow_by_year.items()
+            if year <= _MAX_YEAR
+        )
+    else:
+        npv = math.fsum(cash_flow_by_year.values())
+
     return mine_life_years, float(npv)
 
 
