@@ -48,7 +48,7 @@ def build_precedence_graph_full(df: pd.DataFrame, osa: float, backend: Optional[
     edges_v = []
     
     estimated_edges = 0
-    MAX_EDGES = 300_000_000  # ~2.4 GB RAM untuk edge arrays (int32 u+v)
+    MAX_EDGES = 400_000_000  # ~3.2 GB RAM untuk edge arrays (int32 u+v)
 
     
     for i, z_lower in enumerate(unique_z):
@@ -231,7 +231,7 @@ def build_precedence_graph_global_osa(
     edges_u = []
     edges_v = []
     exact_edges = 0
-    MAX_EDGES = 300_000_000  # ~2.4 GB RAM untuk edge arrays (int32 u+v)
+    MAX_EDGES = 400_000_000  # ~3.2 GB RAM untuk edge arrays (int32 u+v)
     
     for (di, dj, dk) in reduced_offsets:
         src_i_start = max(0, -di)
@@ -341,7 +341,7 @@ def build_precedence_graph_geon(
     edges_v = []
     
     exact_edges = 0
-    MAX_EDGES = 300_000_000  # ~2.4 GB RAM untuk edge arrays (int32 u+v)
+    MAX_EDGES = 400_000_000  # ~3.2 GB RAM untuk edge arrays (int32 u+v)
 
     
     t_off_0 = time.time()
