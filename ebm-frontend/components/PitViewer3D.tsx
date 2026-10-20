@@ -20,26 +20,24 @@ function CaptureManager() {
   return null;
 }
 
-function getHeatmapColor(val: number): THREE.Color {
-  // val is 0.0 to 1.0 (from Cut-off to Max Grade)
-  // Stops: 0=Blue, 0.25=Cyan, 0.5=Green, 0.75=Yellow, 1=Red
-  val = Math.max(0, Math.min(1, val));
-  
-  const stops = [
-    { v: 0.0, c: new THREE.Color('#2563eb') }, // Blue 600
-    { v: 0.25, c: new THREE.Color('#06b6d4') }, // Cyan 500
-    { v: 0.5, c: new THREE.Color('#10b981') }, // Emerald 500
-    { v: 0.75, c: new THREE.Color('#f59e0b') }, // Amber 500
-    { v: 1.0, c: new THREE.Color('#ef4444') }, // Red 500
-  ];
 
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (val >= stops[i].v && val <= stops[i+1].v) {
-      const t = (val - stops[i].v) / (stops[i+1].v - stops[i].v);
-      return stops[i].c.clone().lerp(stops[i+1].c, t);
+const HEATMAP_STOPS = [
+  { v: 0.0, c: new THREE.Color('#2563eb') }, // Blue 600
+  { v: 0.25, c: new THREE.Color('#06b6d4') }, // Cyan 500
+  { v: 0.5, c: new THREE.Color('#10b981') }, // Emerald 500
+  { v: 0.75, c: new THREE.Color('#f59e0b') }, // Amber 500
+  { v: 1.0, c: new THREE.Color('#ef4444') }, // Red 500
+];
+
+function getHeatmapColor(val: number, target: THREE.Color = new THREE.Color()): THREE.Color {
+  val = Math.max(0, Math.min(1, val));
+  for (let i = 0; i < HEATMAP_STOPS.length - 1; i++) {
+    if (val >= HEATMAP_STOPS[i].v && val <= HEATMAP_STOPS[i+1].v) {
+      const t = (val - HEATMAP_STOPS[i].v) / (HEATMAP_STOPS[i+1].v - HEATMAP_STOPS[i].v);
+      return target.copy(HEATMAP_STOPS[i].c).lerp(HEATMAP_STOPS[i+1].c, t);
     }
   }
-  return stops[stops.length - 1].c;
+  return target.copy(HEATMAP_STOPS[HEATMAP_STOPS.length - 1].c);
 }
 
 
@@ -73,10 +71,21 @@ function useNormalized(blocks: BlockData[]) {
       const minYVal = y0, maxYVal = y1;
       minZVal = z0; maxZVal = z1;
 
-      // blockSize: unique X spacing
-      const xs = blocks.map((b) => b.Local_X);
-      const uniqueX = [...new Set(xs)].sort((a, b) => a - b);
-      blockSize = uniqueX.length > 1 ? Math.abs(uniqueX[1] - uniqueX[0]) : 10;
+      // Fast blockSize determination: avoid sorting 600k numbers
+      if (blocks[0]?.DX && blocks[0].DX > 0) {
+        blockSize = blocks[0].DX;
+      } else {
+        const sampleLimit = Math.min(blocks.length, 200);
+        let foundDelta = 0;
+        for (let i = 1; i < sampleLimit; i++) {
+          const delta = Math.abs(blocks[i].Local_X - blocks[0].Local_X);
+          if (delta > 0.001) {
+            foundDelta = delta;
+            break;
+          }
+        }
+        blockSize = foundDelta > 0 ? foundDelta : 10;
+      }
 
       const rangeX = Math.max(maxXVal - minXVal, 1);
       const rangeY = Math.max(maxYVal - minYVal, 1);
@@ -157,111 +166,100 @@ function useNormalized(blocks: BlockData[]) {
     }
     if (maxGrade < 0.01) maxGrade = 1;
 
-    // Voxel Precision: ukuran pas dengan rasio 0.995 untuk mencegah Z-fighting tanpa overlap
-    const normalized = blocks.map((b) => {
-      const bdx = (b.DX || blockSize) * scale;
-      const bdy = (b.DY || blockSize) * scale;
-      const bdz = (b.DZ || blockSize) * scale;
-      return {
-        ...b,
-        nx: (b.Local_X - midX) * scale,
-        ny: (b.Z - midZ) * scale,
-        nz: (b.Local_Y - midY) * scale,
-        bsX: bdx * 0.995,
-        bsY: bdz * 0.995,
-        bsZ: bdy * 0.995,
-      };
-    });
-    return { normalized, minBev, maxBev, maxGrade, blockSize: blockSize * scale, scale, refMinX, refMinY, midX, midY, midZ, minZVal, maxZVal };
+    return { minBev, maxBev, maxGrade, blockSize, scaledBlockSize: blockSize * scale, scale, refMinX, refMinY, midX, midY, midZ, minZVal, maxZVal };
   }, [blocks, minX, minY, topoMesh, pitBoundaryPolygons, demGrid]);
 }
 
 function MinedBlocks({ blocks, clippingZ, clippingX, clippingY, scale, setSelectedBlock }: { blocks: BlockData[]; clippingZ: number; clippingX: number; clippingY: number; scale: number, setSelectedBlock: (b: BlockData) => void }) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const { invalidate } = useThree();
   
-  const { normalized, maxGrade } = useNormalized(blocks);
+  const { midX, midY, midZ, blockSize, maxGrade } = useNormalized(blocks);
   const { viewMode, lithologyColors, financialParams, activeShell, nestedPits } = useEBMStore();
 
-  // Derive the active RF from the shell index to filter block visibility
   const activeRF = useMemo(() => {
     if (!nestedPits || nestedPits.length === 0) return Infinity;
-    // activeShell is 1-based; 0 means show all
     if (activeShell <= 0) return Infinity;
     const idx = Math.min(activeShell - 1, nestedPits.length - 1);
     return nestedPits[idx]?.rf ?? Infinity;
   }, [activeShell, nestedPits]);
 
-  const visible = useMemo(
-    () => normalized.filter((b) => {
-      if (b.Z > clippingZ || b.Local_X > clippingX || b.Local_Y > clippingY) return false;
-      if (b.MINED_STATUS !== 1) return false;
-      // Shell filter: only show blocks whose First_RF <= activeRF
-      // Fall back gracefully if First_RF is missing (old API response)
+  // Filter visible blocks
+  const visible = useMemo(() => {
+    const res: BlockData[] = [];
+    const len = blocks.length;
+    for (let i = 0; i < len; i++) {
+      const b = blocks[i];
+      if (b.MINED_STATUS !== 1) continue;
+      if (b.Z > clippingZ || b.Local_X > clippingX || b.Local_Y > clippingY) continue;
       const firstRF = (b as any).First_RF;
       if (firstRF !== undefined && firstRF !== null && isFinite(activeRF)) {
-        return firstRF <= activeRF + 1e-9; // epsilon for float precision
+        if (firstRF > activeRF + 1e-9) continue;
       }
-      return true; // no First_RF data → show all (backward compat)
-    }),
-    [normalized, clippingZ, clippingX, clippingY, activeRF]
-  );
-
-  // Read Pushback_Phase directly from backend-assigned field (1, 2, or 3)
-  // This replaces the incorrect elevation-chunking approach.
-  const phases = useMemo(() => {
-    if (viewMode !== 'Pushback Phase') return new Map<any, number>();
-    const map = new Map<any, number>();
-    visible.forEach((b) => {
-      map.set(b, (b as any).Pushback_Phase || 0);
-    });
-    return map;
-  }, [visible, viewMode]);
+      res.push(b);
+    }
+    return res;
+  }, [blocks, clippingZ, clippingX, clippingY, activeRF]);
 
   useEffect(() => {
     if (!meshRef.current || !visible.length) return;
     const mesh = meshRef.current;
     
-    const profitColor = new THREE.Color('#10b981'); // Emerald 500
-    const lossColor = new THREE.Color('#ef4444'); // Red 500
-    const wasteColor = new THREE.Color('#64748b'); // Slate 500 (Waste / Below Cut-off)
+    const profitColor = new THREE.Color('#10b981');
+    const lossColor = new THREE.Color('#ef4444');
+    const wasteColor = new THREE.Color('#64748b');
+    const oreColor = new THREE.Color('#fbbf24');
+    const phase1Color = new THREE.Color('#fbbf24');
+    const phase2Color = new THREE.Color('#f97316');
+    const phase3Color = new THREE.Color('#ef4444');
+    const tempColor = new THREE.Color();
 
-    visible.forEach((b, i) => {
-      dummy.position.set(b.nx, b.ny, b.nz);
-      dummy.scale.set(b.bsX, b.bsY, b.bsZ);
+    const count = visible.length;
+    for (let i = 0; i < count; i++) {
+      const b = visible[i];
+      const nx = (b.Local_X - midX) * scale;
+      const ny = (b.Z - midZ) * scale;
+      const nz = (b.Local_Y - midY) * scale;
+      const bsX = (b.DX || blockSize) * scale * 0.995;
+      const bsY = (b.DZ || blockSize) * scale * 0.995;
+      const bsZ = (b.DY || blockSize) * scale * 0.995;
+
+      dummy.position.set(nx, ny, nz);
+      dummy.scale.set(bsX, bsY, bsZ);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       
-      let color: THREE.Color;
+      let color = wasteColor;
       if (viewMode === 'Destination') {
-        // Gold/Amber = Ore (Pabrik), Slate = Waste (Dump)
-        color = b.Destination === 'Ore' ? new THREE.Color('#fbbf24') : wasteColor;
+        color = (b.Destination === 'Ore' || b.Model_Type === 'Ore') ? oreColor : wasteColor;
       } else if (viewMode === 'Lithology') {
-        color = new THREE.Color(lithologyColors[b.RockType] || '#ffffff');
+        const hex = lithologyColors[b.RockType];
+        if (hex) { tempColor.set(hex); color = tempColor; }
       } else if (viewMode === 'Economic (BEV)') {
         color = b.BEV > 0 ? profitColor : lossColor;
       } else if (viewMode === 'Pushback Phase') {
-        const p = phases.get(b);
-        if (p === 1) color = new THREE.Color('#fbbf24'); // Phase 1: Amber
-        else if (p === 2) color = new THREE.Color('#f97316'); // Phase 2: Oranye
-        else if (p === 3) color = new THREE.Color('#ef4444'); // Phase 3: Merah
-        else color = new THREE.Color('#64748b');
+        const p = (b as any).Pushback_Phase || 0;
+        if (p === 1) color = phase1Color;
+        else if (p === 2) color = phase2Color;
+        else if (p === 3) color = phase3Color;
+        else color = wasteColor;
       } else {
-        // Grade Heatmap: Blok di bawah cut_off_grade atau berstatus Waste diwarnai slate
-        const cog = financialParams.cut_off_grade ?? 0.5;
+        const cog = financialParams?.cut_off_grade ?? 0.5;
         if (b.Grade < cog || b.Model_Type === 'Waste' || b.Destination === 'Waste') {
           color = wasteColor;
         } else {
-          const normGrade = Math.max(0, b.Grade) / maxGrade;
-          color = getHeatmapColor(normGrade);
+          const normGrade = Math.max(0, b.Grade) / (maxGrade || 1);
+          color = getHeatmapColor(normGrade, tempColor);
         }
       }
       mesh.setColorAt(i, color);
-    });
+    }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.count = visible.length;
-  }, [visible, dummy, maxGrade, viewMode, lithologyColors, phases, financialParams]);
+    mesh.count = count;
+    invalidate();
+  }, [visible, dummy, maxGrade, viewMode, lithologyColors, financialParams, midX, midY, midZ, scale, blockSize, invalidate]);
 
   if (!visible.length) return null;
   return (
@@ -285,8 +283,9 @@ function MinedBlocks({ blocks, clippingZ, clippingX, clippingY, scale, setSelect
 function WasteBlocks({ blocks, clippingZ, clippingX, clippingY, scale, setSelectedBlock }: { blocks: BlockData[]; clippingZ: number; clippingX: number; clippingY: number; scale: number, setSelectedBlock: (b: BlockData) => void }) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const { normalized } = useNormalized(blocks);
+  const { midX, midY, midZ, blockSize } = useNormalized(blocks);
   const { viewMode, lithologyColors, activeShell, nestedPits } = useEBMStore();
+  const { invalidate } = useThree();
 
   const activeRF = useMemo(() => {
     if (!nestedPits || nestedPits.length === 0) return Infinity;
@@ -295,51 +294,59 @@ function WasteBlocks({ blocks, clippingZ, clippingX, clippingY, scale, setSelect
     return nestedPits[idx]?.rf ?? Infinity;
   }, [activeShell, nestedPits]);
 
-  const visible = useMemo(
-    () => normalized.filter((b) => {
-      if (b.Z > clippingZ || b.Local_X > clippingX || b.Local_Y > clippingY) return false;
-      
-      if (b.MINED_STATUS !== 1) return true; // Truly unmined waste
-      
-      // If it is mined, but its First_RF > activeRF, it's not in the active shell yet,
-      // so we render it as base/waste block to prevent holes/Z-fighting
+  const visible = useMemo(() => {
+    const res: BlockData[] = [];
+    const len = blocks.length;
+    for (let i = 0; i < len; i++) {
+      const b = blocks[i];
+      if (b.Z > clippingZ || b.Local_X > clippingX || b.Local_Y > clippingY) continue;
+      if (b.MINED_STATUS !== 1) { res.push(b); continue; }
       const firstRF = (b as any).First_RF;
       if (firstRF !== undefined && firstRF !== null && isFinite(activeRF)) {
-        return firstRF > activeRF + 1e-9;
+        if (firstRF > activeRF + 1e-9) res.push(b);
       }
-      return false; // It's in the active shell, so don't render it here (MinedBlocks handles it)
-    }),
-    [normalized, clippingZ, clippingX, clippingY, activeRF]
-  );
+    }
+    return res;
+  }, [blocks, clippingZ, clippingX, clippingY, activeRF]);
 
   useEffect(() => {
     if (!meshRef.current || !visible.length) return;
     const mesh = meshRef.current;
     
-    const defaultColor = new THREE.Color('#64748b'); // Slate 500
-    const profitColor = new THREE.Color('#10b981'); // Emerald 500
-    const lossColor = new THREE.Color('#ef4444'); // Red 500
+    const defaultColor = new THREE.Color('#64748b');
+    const profitColor = new THREE.Color('#10b981');
+    const lossColor = new THREE.Color('#ef4444');
+    const tempColor = new THREE.Color();
     
-    visible.forEach((b, i) => {
-      dummy.position.set(b.nx, b.ny, b.nz);
-      dummy.scale.set(b.bsX, b.bsY, b.bsZ);
+    const count = visible.length;
+    for (let i = 0; i < count; i++) {
+      const b = visible[i];
+      const nx = (b.Local_X - midX) * scale;
+      const ny = (b.Z - midZ) * scale;
+      const nz = (b.Local_Y - midY) * scale;
+      const bsX = (b.DX || blockSize) * scale * 0.995;
+      const bsY = (b.DZ || blockSize) * scale * 0.995;
+      const bsZ = (b.DY || blockSize) * scale * 0.995;
+
+      dummy.position.set(nx, ny, nz);
+      dummy.scale.set(bsX, bsY, bsZ);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       
-      let color: THREE.Color;
+      let color = defaultColor;
       if (viewMode === 'Lithology') {
-        color = new THREE.Color(lithologyColors[b.RockType] || '#ffffff');
+        const hex = lithologyColors[b.RockType];
+        if (hex) { tempColor.set(hex); color = tempColor; }
       } else if (viewMode === 'Economic (BEV)') {
         color = b.BEV > 0 ? profitColor : lossColor;
-      } else {
-        color = defaultColor;
       }
       mesh.setColorAt(i, color);
-    });
+    }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.count = visible.length;
-  }, [visible, dummy, viewMode, lithologyColors]);
+    mesh.count = count;
+    invalidate();
+  }, [visible, dummy, viewMode, lithologyColors, midX, midY, midZ, scale, blockSize, invalidate]);
 
   if (!visible.length) return null;
   const isTransparent = viewMode === 'Grade Heatmap';
@@ -529,30 +536,30 @@ function DemRender({ demGrid, scale, midX, midY, midZ }: { demGrid: DemGrid; sca
 
 // Renders the outer hull of all mined blocks as a glowing wireframe pit shell
 function PitShellRender({ blocks, scale }: { blocks: BlockData[]; scale: number }) {
-  const { normalized } = useNormalized(blocks);
-
-  const minedNorm = useMemo(() => normalized.filter(b => b.MINED_STATUS === 1), [normalized]);
+  const { midX, midY, midZ, blockSize } = useNormalized(blocks);
 
   const shellGeometry = useMemo(() => {
-    if (minedNorm.length === 0) return null;
-
     let minY = Infinity;
     const colMap = new Map<string, number>();
-    for (let i = 0; i < minedNorm.length; i++) {
-      const b = minedNorm[i];
-      if (b.ny < minY) minY = b.ny;
-      const key = `${b.nx.toFixed(2)},${b.nz.toFixed(2)}`;
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.MINED_STATUS !== 1) continue;
+      const ny = (b.Z - midZ) * scale;
+      if (ny < minY) minY = ny;
+      const nx = (b.Local_X - midX) * scale;
+      const nz = (b.Local_Y - midY) * scale;
+      const key = `${nx.toFixed(2)},${nz.toFixed(2)}`;
       const cur = colMap.get(key);
-      if (cur === undefined || b.ny > cur) colMap.set(key, b.ny);
+      if (cur === undefined || ny > cur) colMap.set(key, ny);
     }
-    if (minY === Infinity) minY = 0;
+    if (minY === Infinity) return null;
 
     const positions: number[] = [];
     const indices: number[] = [];
     let idx = 0;
 
-    const bsX = minedNorm[0]?.bsX ?? 1;
-    const bsZ = minedNorm[0]?.bsZ ?? 1;
+    const bsX = (blocks[0]?.DX || blockSize) * scale;
+    const bsZ = (blocks[0]?.DY || blockSize) * scale;
 
     for (const [key, topY] of colMap.entries()) {
       const [nx, nz] = key.split(',').map(Number);
@@ -578,7 +585,7 @@ function PitShellRender({ blocks, scale }: { blocks: BlockData[]; scale: number 
     geo.setIndex(indices);
     geo.computeVertexNormals();
     return geo;
-  }, [minedNorm]);
+  }, [blocks, midX, midY, midZ, scale, blockSize]);
 
   if (!shellGeometry) return null;
 
@@ -598,6 +605,8 @@ function SceneContent() {
   const { pitBlocks, topoMesh, demGrid, clippingZ, clippingX, clippingY, layerVisibility, setSelectedBlock, pitBoundaryPolygons, canvasTheme } = useEBMStore();
   const { scale, midX, midY, midZ, minZVal } = useNormalized(pitBlocks);
   const isDark = canvasTheme !== 'light';
+  // Disable PitShell wireframe for very large datasets (it builds a per-column colMap string key)
+  const shellSafe = pitBlocks.length <= 50_000;
   
   return (
     <>
@@ -609,7 +618,7 @@ function SceneContent() {
 
       {layerVisibility.blockModel && layerVisibility.wasteBlocks && <WasteBlocks blocks={pitBlocks} clippingZ={clippingZ} clippingX={clippingX} clippingY={clippingY} scale={scale} setSelectedBlock={setSelectedBlock} />}
       {layerVisibility.blockModel && layerVisibility.pitShell && <MinedBlocks blocks={pitBlocks} clippingZ={clippingZ} clippingX={clippingX} clippingY={clippingY} scale={scale} setSelectedBlock={setSelectedBlock} />}
-      {layerVisibility.pitShellWireframe && pitBlocks.length > 0 && <PitShellRender blocks={pitBlocks} scale={scale} />}
+      {layerVisibility.pitShellWireframe && pitBlocks.length > 0 && shellSafe && <PitShellRender blocks={pitBlocks} scale={scale} />}
       {layerVisibility.topography && topoMesh && <TopographyRender topoMesh={topoMesh} scale={scale} midX={midX} midY={midY} midZ={midZ} />}
       {layerVisibility.topography && demGrid && <DemRender demGrid={demGrid} scale={scale} midX={midX} midY={midY} midZ={midZ} />}
       {layerVisibility.pitBoundary && pitBoundaryPolygons && pitBoundaryPolygons.length > 0 && (
@@ -1045,15 +1054,15 @@ export default function PitViewer3D() {
       <Canvas
         camera={{ position: [50, 40, 50], fov: 45, near: 0.5, far: 2000 }}
         gl={{
-          antialias: true,
+          antialias: pitBlocks.length < 200_000, // disable AA on very large datasets
           alpha: false,
           preserveDrawingBuffer: true,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: isDark ? 1.15 : 1.0,
         }}
-        dpr={[1, 2]}
-        frameloop={activeTab === 'workspace' ? 'always' : 'never'}
+        dpr={pitBlocks.length > 100_000 ? 1 : [1, 1.5]}
+        frameloop={activeTab === 'workspace' ? 'demand' : 'never'}
       >
         <CaptureManager />
         <color attach="background" args={[isDark ? '#080b11' : '#F8FAFC']} />

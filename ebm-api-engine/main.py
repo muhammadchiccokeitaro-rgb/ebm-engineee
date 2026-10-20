@@ -27,6 +27,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "version": "2.0.1-GEON"}
+
 def read_csv_robust(content: bytes) -> pd.DataFrame:
     """
     Baca CSV secara robust:
@@ -390,6 +394,14 @@ async def optimize_pit_endpoint(
             discount_rate=params.discount_rate,
             mining_capacity_tpy=params.mining_capacity_tpy,
         )
+        # Aditif: sertakan nilai discount_rate dan production_capacity_tpy yang benar-benar dipakai
+        if pit_selection is not None:
+            disc_val = float(params.discount_rate) if params.discount_rate is not None else 0.0
+            prod_val = float(params.production_capacity_tpy)
+            pit_selection["discount_rate"] = disc_val
+            pit_selection["production_capacity_tpy"] = prod_val
+            pit_selection["discount_rate_used"] = disc_val
+            pit_selection["production_capacity_tpy_used"] = prod_val
 
     # Phase 7: Data Model JSON Out
     response = {

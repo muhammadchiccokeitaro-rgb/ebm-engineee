@@ -87,6 +87,10 @@ export interface PitSelectionResult {
   };
   assumptions: Record<string, any>;
   valuation_basis: string;
+  discount_rate?: number;
+  production_capacity_tpy?: number;
+  discount_rate_used?: number;
+  production_capacity_tpy_used?: number;
 }
 
 interface EBMStore {
@@ -238,7 +242,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
     currency: 'IDR',
     revenue_factors: [0.6, 0.8, 1.0],
     production_capacity_tpy: null,
-    discount_rate: null,
+    discount_rate: 0.1,
   },
   viewMode: 'Grade Heatmap',
   lithologyColors: {},
@@ -545,7 +549,7 @@ const useEBMStore = create<EBMStore>((set, get) => ({
         delete payload.discount_rate;
       } else {
         payload.production_capacity_tpy = fp.production_capacity_tpy;
-        payload.discount_rate = fp.discount_rate ?? 0.0;
+        payload.discount_rate = fp.discount_rate != null ? fp.discount_rate : 0.1;
       }
       const formData = new FormData();
       formData.append('file', csvFile);
@@ -635,7 +639,12 @@ const useEBMStore = create<EBMStore>((set, get) => ({
       
     } catch (error: any) {
       console.error(error);
-      set({ error: error.message, isLoading: false });
+      const isFetchError = error?.name === 'TypeError' || String(error?.message || '').toLowerCase().includes('fetch');
+      const apiBase = get().apiUrl || getInitialApiUrl();
+      const message = isFetchError
+        ? `Gagal terhubung ke backend API di "${apiBase}". Pastikan backend FastAPI aktif atau periksa pengaturan API Server di menu toolbar.`
+        : (error.message || 'Gagal menjalankan optimasi');
+      set({ error: message, isLoading: false });
     }
   },
 }));

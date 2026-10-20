@@ -348,3 +348,56 @@ def test_api_without_production_capacity_keeps_baseline_response_contract():
     assert pit_selection["assumptions"]["mining_capacity_tpy"] == 25_000.0
     assert pit_selection["assumptions"]["mining_capacity_applied"] is False
     assert "End-of-year" in pit_selection["assumptions"]["discount_convention"]
+    assert pit_selection["discount_rate"] == 0.1
+    assert pit_selection["production_capacity_tpy"] == 10_000.0
+    for candidate in pit_selection["candidates"]:
+        assert candidate["npv_best"] < candidate["undiscounted_value"]
+        assert candidate["npv_worst"] < candidate["undiscounted_value"]
+
+
+def test_api_with_zero_discount_rate_equals_undiscounted_value():
+    rows = []
+    for z in range(2):
+        for y in range(2):
+            for x in range(2):
+                rows.append({
+                    "X": x * 10,
+                    "Y": y * 10,
+                    "Z": z * 10,
+                    "DX": 10,
+                    "DY": 10,
+                    "DZ": 10,
+                    "Grade": 1.5,
+                    "Density": 2.5,
+                    "RockType": "Ore",
+                })
+    df = pd.DataFrame(rows)
+    params = {
+        "commodity_price": 50000,
+        "ore_mining_cost": 4500,
+        "waste_mining_cost": 2500,
+        "processing_cost": 4500,
+        "selling_cost": 1500,
+        "metallurgical_recovery": 0.9,
+        "osa": 45,
+        "cut_off_grade": 0.9,
+        "grade_unit": "g_per_t",
+        "price_unit": "per_gram",
+        "revenue_factors": [0.6, 1.0],
+        "production_capacity_tpy": 10_000.0,
+        "discount_rate": 0.0,
+    }
+    response = client.post(
+        "/api/v1/optimize-pit",
+        files={"file": ("zero_discount.csv", io.BytesIO(df.to_csv(index=False).encode()), "text/csv")},
+        data={"financial_params": json.dumps(params)},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "pit_selection" in data
+    pit_selection = data["pit_selection"]
+    assert pit_selection["discount_rate"] == 0.0
+    assert pit_selection["production_capacity_tpy"] == 10_000.0
+    for candidate in pit_selection["candidates"]:
+        assert candidate["npv_best"] == pytest.approx(candidate["undiscounted_value"])
+        assert candidate["npv_worst"] == pytest.approx(candidate["undiscounted_value"])

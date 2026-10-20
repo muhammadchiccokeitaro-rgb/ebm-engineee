@@ -117,12 +117,12 @@ export default function NumericInput({
 
         {/* Two-part layout: Right-aligned input and fixed right unit suffix */}
         <div
-          className={`flex items-center w-36 bg-[#1A1A24] border rounded px-2 py-1 transition-colors ${
+          className={`flex items-center w-36 bg-[#0d0d18] border rounded-md px-2.5 py-1.5 transition-all ${
             errorMsg
               ? 'border-red-500/80 ring-1 ring-red-500/50'
               : isFocused
-              ? 'border-blue-500/80 ring-1 ring-blue-500/30'
-              : 'border-[#2A2A3A] hover:border-gray-600'
+              ? 'border-blue-500/80 ring-1 ring-blue-500/30 bg-[#101020]'
+              : 'border-[#232338] hover:border-[#383854]'
           }`}
         >
           <input
@@ -137,7 +137,7 @@ export default function NumericInput({
             className="w-full bg-transparent text-[#F1F1F4] font-mono text-xs text-right focus:outline-none placeholder-gray-600"
           />
           {unit && (
-            <span className="text-[10px] font-mono text-[#787885] ml-1.5 shrink-0 select-none whitespace-nowrap">
+            <span className="text-[10px] font-mono text-[#78788f] ml-1.5 shrink-0 select-none whitespace-nowrap">
               {unit.trim()}
             </span>
           )}

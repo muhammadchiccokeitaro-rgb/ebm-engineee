@@ -207,20 +207,23 @@ export default async function exportPDF(
     const ps = pitSelection;
     section('Evaluasi NPV per Revenue Factor (Pit Selection)');
 
-    const capStr = financialParams.production_capacity_tpy != null && financialParams.production_capacity_tpy > 0
-      ? `${fmtID(financialParams.production_capacity_tpy, 0)} t ore/th`
-      : 'Belum ditentukan';
-    const discStr = financialParams.discount_rate != null
-      ? `${fmtID(financialParams.discount_rate * 100, 1)}% / tahun`
-      : '10% / tahun';
+    const capVal = ps.production_capacity_tpy ?? ps.production_capacity_tpy_used ?? financialParams.production_capacity_tpy;
+    const capStr = capVal != null && capVal > 0
+      ? `${fmtID(capVal, 0)} t/tahun`
+      : '—';
 
-    noteRow(`Dasar Penilaian: ${ps.valuation_basis || 'base_price (RF=1.0)'} | Kapasitas: ${capStr} | Discount Rate: ${discStr}`);
-    noteRow('Urutan Shell (Best-case): RF naik -> Z turun (atas ke bawah). Urutan Bench (Worst-case): Z turun langsung.');
-    noteRow('Diskonto diskrit akhir tahun (t=1). Hasil bersifat indikatif untuk evaluasi batas pit, bukan jadwal operasional final.');
+    const discVal = ps.discount_rate ?? ps.discount_rate_used;
+    const discStr = discVal != null && discVal > 0
+      ? `${Number.isInteger(discVal * 100) ? (discVal * 100).toFixed(0) : (discVal * 100).toFixed(1)}%`
+      : (discVal === 0 ? 'tidak diset (0%)' : (financialParams.discount_rate != null ? `${fmtID(financialParams.discount_rate * 100, 1)}%` : 'tidak diset (0%)'));
+
+    noteRow(`Dasar Penilaian: ${ps.valuation_basis || 'base_price (RF=1.0)'} | Kapasitas produksi: ${capStr} | Discount rate dipakai: ${discStr}`);
+    noteRow('Urutan: Shell demi Shell (RF naik -> Z turun) vs. Bench demi Bench (Z turun langsung).');
+    noteRow('Kedua urutan adalah batas indikatif dan tidak ada jaminan salah satunya lebih tinggi.');
     y += 2;
 
     // Table header — exactly 178 mm (CONTENT_W)
-    const colW = [14, 30, 22, 22, 16, 18, 28, 28];
+    const colW = [14, 28, 20, 20, 16, 16, 32, 32];
     const colX = colW.reduce((acc: number[], w, i) => {
       acc.push(i === 0 ? MARGIN : acc[i - 1] + colW[i - 1]);
       return acc;
@@ -232,14 +235,14 @@ export default async function exportPDF(
       'Waste (t)',
       'SR (W:O)',
       'Umur (th)',
-      `NPV Shell (${curr})`,
-      `NPV Bench (${curr})`,
+      `NPV shell demi shell (${curr})`,
+      `NPV bench demi bench (${curr})`,
     ];
     const maxBest = Math.max(...ps.candidates.map((c: any) => c.npv_best));
     const maxWorst = Math.max(...ps.candidates.map((c: any) => c.npv_worst));
 
     doc.setFillColor(22, 33, 72); doc.rect(MARGIN, y, CONTENT_W, 7, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6.8); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(6.2); doc.setFont('helvetica', 'bold');
     headers.forEach((h, i) => {
       doc.text(h, colX[i] + (i === 0 ? 1 : colW[i] - 1), y + 4.5, { align: i === 0 ? 'left' : 'right' });
     });
@@ -273,7 +276,7 @@ export default async function exportPDF(
 
     // Rekomendasi Box
     if (ps.recommendation && ps.recommendation.best_case_rf !== null) {
-      const recH = ps.recommendation.recommendations_differ ? 25 : 20;
+      const recH = ps.recommendation.recommendations_differ ? 28 : 24;
       doc.setFillColor(245, 247, 252);
       doc.setDrawColor(200, 208, 228);
       doc.setLineWidth(0.3);
@@ -283,21 +286,24 @@ export default async function exportPDF(
       doc.text('Rekomendasi Pit Shell Optimal (Indikatif):', MARGIN + 4, y + 5);
 
       doc.setFontSize(7.2); doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
-      doc.text(`- Skenario Shell demi Shell (Urutan Tambang Atas -> Bawah): RF ${fmtID(ps.recommendation.best_case_rf, 2)}`, MARGIN + 4, y + 10);
-      doc.text(`- Skenario Bench demi Bench (Urutan Bebas Z): RF ${fmtID(ps.recommendation.worst_case_rf, 2)}`, MARGIN + 4, y + 14.5);
+      doc.text(`- RF optimal (shell demi shell): RF ${fmtID(ps.recommendation.best_case_rf, 2)}`, MARGIN + 4, y + 10);
+      doc.text(`- RF optimal (bench demi bench): RF ${fmtID(ps.recommendation.worst_case_rf, 2)}`, MARGIN + 4, y + 14.5);
+      doc.setFontSize(6.5); doc.setTextColor(90, 90, 100);
+      doc.text('Catatan: Kedua urutan adalah batas indikatif dan tidak ada jaminan salah satunya lebih tinggi.', MARGIN + 4, y + 19);
 
       if (ps.recommendation.recommendations_differ) {
         doc.setTextColor(170, 90, 0); doc.setFont('helvetica', 'italic');
-        doc.text('Catatan: Urutan produksi menghasilkan RF optimal berbeda karena distribusi rasio pengupasan (stripping ratio).', MARGIN + 4, y + 20);
+        doc.text('Urutan produksi menghasilkan RF optimal berbeda karena distribusi rasio pengupasan (stripping ratio).', MARGIN + 4, y + 24);
       }
       y += recH + 5;
     }
 
     // Catatan Asumsi & Batasan Box
     const notes = [
+      '- Kedua urutan adalah batas indikatif dan tidak ada jaminan salah satunya lebih tinggi.',
+      '- Urutan NPV shell demi shell (RF naik -> Z turun) dan NPV bench demi bench (Z turun langsung) mencerminkan rentang batas teoretis urutan penggalian.',
       '- Tanpa memperhitungkan belanja modal awal (CAPEX), eskalasi biaya penambangan, maupun batasan kapasitas fleet alat berat.',
       '- Tidak memperhitungkan lebar kerja minimum alat operasional (minimum mining width) antar tahapan pushback.',
-      '- Skenario Shell dan Bench mencerminkan rentang batas atas (best-case) dan batas bawah (worst-case) teoretis urutan penggalian.',
       '- Nilai ini dihitung untuk membantu penetapan batas pit ultimate dan analisis risiko, bukan pengganti jadwal tambang operasional detail.',
     ];
     const notesH = notes.length * 4.5 + 8;

@@ -153,19 +153,26 @@ export default function ProjectExplorer() {
           </div>
         )}
 
-        {/* STEP 1: DATA & LAPISAN */}
-        <div className="border border-[#222230] bg-[#141420] rounded-lg overflow-hidden">
+        {/* SECTION 1: DATA & LAPISAN */}
+        <div className="border border-[#232338] bg-[#12121e] rounded-xl overflow-hidden shadow-sm">
           <button
             onClick={() => setStep1Open(!step1Open)}
-            className="w-full px-3 py-2.5 flex items-center justify-between bg-[#181826] hover:bg-[#1E1E30] transition-colors text-left"
+            className="w-full px-3.5 py-3 flex items-center justify-between bg-[#161626] hover:bg-[#1c1c30] transition-colors text-left btn-tactile"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-900/60 text-blue-400 font-mono text-xs flex items-center justify-center font-bold border border-blue-700/50">
-                1
-              </span>
-              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Data & File Masukan</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-md bg-blue-950/60 text-blue-400 border border-blue-800/40 flex items-center justify-center">
+                <FileSpreadsheet size={13} />
+              </div>
+              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Data Model & Topografi</span>
             </div>
-            {step1Open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+            <div className="flex items-center gap-2">
+              {csvFile && (
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
+                  Model Siap
+                </span>
+              )}
+              {step1Open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+            </div>
           </button>
 
           {step1Open && (
@@ -235,32 +242,37 @@ export default function ProjectExplorer() {
           )}
         </div>
 
-        {/* STEP 2: PARAMETER FINANSIAL & TEKNIK */}
-        <div className="border border-[#222230] bg-[#141420] rounded-lg overflow-hidden">
+        {/* SECTION 2: PARAMETER FINANSIAL & TEKNIK */}
+        <div className="border border-[#232338] bg-[#12121e] rounded-xl overflow-hidden shadow-sm">
           <button
             onClick={() => setStep2Open(!step2Open)}
-            className="w-full px-3 py-2.5 flex items-center justify-between bg-[#181826] hover:bg-[#1E1E30] transition-colors text-left"
+            className="w-full px-3.5 py-3 flex items-center justify-between bg-[#161626] hover:bg-[#1c1c30] transition-colors text-left btn-tactile"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-900/60 text-blue-400 font-mono text-xs flex items-center justify-center font-bold border border-blue-700/50">
-                2
-              </span>
-              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Parameter Finansial & Lereng</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-md bg-amber-950/60 text-amber-400 border border-amber-800/40 flex items-center justify-center">
+                <SlidersHorizontal size={13} />
+              </div>
+              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Parameter Ekonomi & Lereng</span>
             </div>
-            {step2Open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-800/40">
+                {financialParams.currency || 'IDR'}
+              </span>
+              {step2Open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+            </div>
           </button>
 
           {step2Open && (
             <div className="p-3 space-y-2">
               {/* Unit selectors */}
-              <div className="bg-[#1A1A26] p-2.5 rounded border border-[#2A2A3A] space-y-2 mb-3">
+              <div className="bg-[#0d0d18] p-3 rounded-lg border border-[#232338] space-y-2.5 mb-3">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-xs text-[#9E9EA8]">Mata Uang</label>
                   <input
                     type="text"
                     value={financialParams.currency || 'IDR'}
                     onChange={(e) => setFinancialParam('currency', e.target.value.toUpperCase())}
-                    className="w-36 bg-[#12121C] text-[#F1F1F4] font-mono text-xs border border-[#2A2A3A] rounded px-2 py-1 text-right focus:outline-none focus:border-blue-500"
+                    className="w-36 bg-[#090912] text-[#F1F1F4] font-mono text-xs border border-[#232338] rounded-md px-2.5 py-1.5 text-right focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
 
@@ -269,7 +281,7 @@ export default function ProjectExplorer() {
                   <select
                     value={financialParams.grade_unit || 'g_per_t'}
                     onChange={(e) => handleUnitChange('grade_unit', e.target.value)}
-                    className="w-36 bg-[#12121C] text-[#F1F1F4] font-mono text-xs border border-[#2A2A3A] rounded px-1 py-1 text-right focus:outline-none focus:border-blue-500"
+                    className="w-36 bg-[#090912] text-[#F1F1F4] font-mono text-xs border border-[#232338] rounded-md px-2 py-1.5 text-right focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 cursor-pointer"
                   >
                     <option value="g_per_t">g/t (gram/ton)</option>
                     <option value="percent">% (persen)</option>
@@ -283,7 +295,7 @@ export default function ProjectExplorer() {
                   <select
                     value={financialParams.price_unit || 'per_gram'}
                     onChange={(e) => handleUnitChange('price_unit', e.target.value)}
-                    className="w-36 bg-[#12121C] text-[#F1F1F4] font-mono text-xs border border-[#2A2A3A] rounded px-1 py-1 text-right focus:outline-none focus:border-blue-500"
+                    className="w-36 bg-[#090912] text-[#F1F1F4] font-mono text-xs border border-[#232338] rounded-md px-2 py-1.5 text-right focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/30 cursor-pointer"
                   >
                     <option value="per_gram">/gram</option>
                     <option value="per_kg">/kg</option>
@@ -461,10 +473,10 @@ export default function ProjectExplorer() {
                   Isi kapasitas produksi untuk mengaktifkan. Hasilnya indikatif, bukan jadwal operasional.
                 </div>
                 {/* Kapasitas Produksi — nullable: kosong = nonaktif */}
-                <div className="mb-1">
+                <div className="mb-2">
                   <div className="flex items-center justify-between gap-2">
                     <label className="text-xs text-[#9E9EA8]">Kapasitas produksi</label>
-                    <div className="flex items-center w-36 bg-[#1A1A24] border border-[#2A2A3A] hover:border-gray-600 rounded px-2 py-1">
+                    <div className="flex items-center w-36 bg-[#0d0d18] border border-[#232338] hover:border-[#383854] focus-within:border-blue-500/80 focus-within:ring-1 focus-within:ring-blue-500/30 rounded-md px-2.5 py-1.5 transition-all">
                       <input
                         type="text"
                         inputMode="decimal"
@@ -481,7 +493,7 @@ export default function ProjectExplorer() {
                         }}
                         className="w-full bg-transparent text-[#F1F1F4] font-mono text-xs text-right focus:outline-none placeholder-gray-600"
                       />
-                      <span className="text-[10px] font-mono text-[#787885] ml-1.5 shrink-0 whitespace-nowrap">t ore/th</span>
+                      <span className="text-[10px] font-mono text-[#78788f] ml-1.5 shrink-0 whitespace-nowrap">t ore/th</span>
                     </div>
                   </div>
                 </div>
@@ -499,17 +511,17 @@ export default function ProjectExplorer() {
           )}
         </div>
 
-        {/* STEP 3: TAMPILAN & LITOLOGI */}
-        <div className="border border-[#222230] bg-[#141420] rounded-lg overflow-hidden">
+        {/* SECTION 3: TAMPILAN & LITOLOGI */}
+        <div className="border border-[#232338] bg-[#12121e] rounded-xl overflow-hidden shadow-sm">
           <button
             onClick={() => setStep3Open(!step3Open)}
-            className="w-full px-3 py-2.5 flex items-center justify-between bg-[#181826] hover:bg-[#1E1E30] transition-colors text-left"
+            className="w-full px-3.5 py-3 flex items-center justify-between bg-[#161626] hover:bg-[#1c1c30] transition-colors text-left btn-tactile"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-900/60 text-blue-400 font-mono text-xs flex items-center justify-center font-bold border border-blue-700/50">
-                3
-              </span>
-              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Visibilitas & Litologi</span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 rounded-md bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center justify-center">
+                <Palette size={13} />
+              </div>
+              <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">Litologi & Layer 3D</span>
             </div>
             {step3Open ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
           </button>
